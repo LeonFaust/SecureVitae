@@ -1,0 +1,8 @@
+pesquisa de modelo para llm treinadas para analise de 
+modelos moondream cv
+modelo olamavision 
+
+modelo de vision implementado apartir de olama 
+
+pi6 
+pi5 4gb 
