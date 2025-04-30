@@ -16,6 +16,8 @@ modeltradutor = "gemma3:4b"
 respostamoondream = ""
 nomeimagem = ""
 descricao_actual = ""
+texto_audio_actual = ""
+analise_final_actual = ""
 url = "http://localhost:11434/api/generate"
 
 cam = cv2.VideoCapture(0)
@@ -35,42 +37,48 @@ def get_next_image_filename(prefix='test', extension='.png'):
             return filename, num
         num += 1
 
-# Função para adicionar a zona de texto abaixo da imagem (altura dinâmica)
-def adicionar_texto_abaixo(frame, texto, altura_linha=25, margem=10):
+# Função para adicionar múltiplas caixas de texto abaixo da imagem com título
+def adicionar_multiplos_textos_abaixo(frame, blocos_texto, altura_linha=25, margem=10):
     largura = frame.shape[1]
+    frame_resultado = frame.copy()
 
-    # Divide o texto longo em várias linhas
-    linhas = []
-    max_chars = 60
-    while len(texto) > max_chars:
-        corte = texto[:max_chars].rfind(' ')
-        if corte == -1:
-            corte = max_chars
-        linhas.append(texto[:corte])
-        texto = texto[corte:].lstrip()
-    linhas.append(texto)
+    for titulo, texto, cor_fundo in blocos_texto:
+        # Junta o título ao texto
+        texto_com_titulo = f"{titulo}:\n{texto.strip()}"
 
-    n_linhas = min(len(linhas), 5)
+        # Divide o texto longo em várias linhas
+        linhas = []
+        max_chars = 60
+        for linha in texto_com_titulo.split('\n'):
+            while len(linha) > max_chars:
+                corte = linha[:max_chars].rfind(' ')
+                if corte == -1:
+                    corte = max_chars
+                linhas.append(linha[:corte])
+                linha = linha[corte:].lstrip()
+            linhas.append(linha)
 
-    altura_total = n_linhas * altura_linha + 2 * margem
+        n_linhas = min(len(linhas), 8)
+        altura_total = n_linhas * altura_linha + 2 * margem
 
-    # Cria uma área preta
-    barra = np.zeros((altura_total, largura, 3), dtype=np.uint8)
+        # Cria a área com a cor de fundo especificada
+        barra = np.full((altura_total, largura, 3), cor_fundo, dtype=np.uint8)
 
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    escala = 0.6
-    cor = (255, 255, 255)
-    espessura = 1
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        escala = 0.6
+        cor_texto = (255, 255, 255)
+        espessura = 1
 
-    # Desenha as linhas na barra
-    y = margem + altura_linha - 5
-    for linha in linhas[:5]:
-        cv2.putText(barra, linha, (10, y), font, escala, cor, espessura, cv2.LINE_AA)
-        y += altura_linha
+        # Desenha as linhas na barra
+        y = margem + altura_linha - 5
+        for linha in linhas[:8]:
+            cv2.putText(barra, linha, (10, y), font, escala, cor_texto, espessura, cv2.LINE_AA)
+            y += altura_linha
 
-    # Junta a imagem e a barra
-    frame_com_barra = np.vstack((frame, barra))
-    return frame_com_barra
+        # Junta a nova barra ao frame actual
+        frame_resultado = np.vstack((frame_resultado, barra))
+
+    return frame_resultado
 
 def screenshot():
     global cam, respostamoondream, nomeimagem, descricao_actual
@@ -109,13 +117,8 @@ def screenshot():
     descricao_actual = unidecode(respostamoondream.strip())
     print(respostamoondream)
 
-    # MOSTRAR A IMAGEM COM A DESCRIÇÃO IMEDIATAMENTE
-    frame_descricao = adicionar_texto_abaixo(frame, descricao_actual)
-    cv2.imshow('Camera', frame_descricao)
-    cv2.waitKey(5000)  # Mostra durante 1 segundo antes de avançar (podes mudar o tempo)
-
 def audio():
-    global respostamoondream, nomeimagem
+    global respostamoondream, nomeimagem, texto_audio_actual, analise_final_actual
     textocompleto = ""
     model_path = "vosk-model-small-pt-0.3"
 
@@ -135,29 +138,46 @@ def audio():
 
     output_file_path = "teste.txt"
 
+    print("Listening for speech. Press b to stop.")
     with open(output_file_path, "a") as output_file:
-        print("Listening for speech. Press b to stop.")
-
         while True:
             data = stream.read(4096)
-
+            
             if rec.AcceptWaveform(data):
                 result = json.loads(rec.Result())
                 recognized_text = result['text']
                 output_file.write(recognized_text + "\n")
 
-                print(recognized_text)
                 textocompleto += " " + recognized_text + " "
+                texto_audio_actual = unidecode(textocompleto.strip())
 
-                if cv2.waitKey(1) == ord('b'):
-                    print("Stopping...")
-                    break
+            else:
+                # Obtem resultado parcial (em tempo real)
+                partial_result = json.loads(rec.PartialResult())
+                recognized_partial = partial_result.get('partial', '')
+
+                # Actualiza o texto visível em tempo real com a frase parcial + o já reconhecido
+                texto_audio_actual = unidecode((textocompleto + " " + recognized_partial).strip())
+                # Mostrar imagem com as 3 caixas (imagem, texto audio em tempo real, analise final vazia)
+                ret, frame = cam.read()
+                caixas_texto = [
+                ("Descricao da imagem", descricao_actual, (0, 0, 0)),
+                ("Texto audio", texto_audio_actual, (50, 50, 50)),
+                ("Analise final", analise_final_actual, (80, 80, 80))
+            ]
+            frame_com_textos = adicionar_multiplos_textos_abaixo(frame, caixas_texto)
+            cv2.imshow('Camera', frame_com_textos)
+
+            if cv2.waitKey(1) == ord('b'):
+                print("Stopping audio capture...")
+                break
 
     stream.stop_stream()
     stream.close()
     p.terminate()
     print(textocompleto)
 
+    # Enviar para análise e guardar
     response = requests.post(url, json={
         "model": modeltradutor,
         "prompt": "não se esqueça de utilizar portugues de portugal analise o seguinte texto mantenha a analise tente contextualizar breve apenas responda uma frase com a sua conclusão: " + textocompleto,
@@ -187,6 +207,10 @@ def audio():
     resposta_completa = responsecompleta.json()['response']
     print("A resposta completa é:")
     print(resposta_completa)
+
+    # Guardar análise final
+    analise_final_actual = unidecode(resposta_completa.strip())
+
     with open("resultados.html", "a", encoding="utf-8") as f:
          f.write(f"""
                  <hr>
@@ -203,16 +227,6 @@ def audio():
 <hr>
 """)
 
-
-''' with open("resultados.txt", "a", encoding="utf-8") as f:
-        f.write(f"\n--- NOVA ANÁLISE ---\n")
-        f.write(f"Imagem: {nomeimagem}\n")
-        f.write(f"Descrição da imagem: {respostamoondream.strip()}\n\n")
-        f.write(f"Texto reconhecido do áudio: {textocompleto.strip()}\n\n")
-        f.write(f"Análise final combinada: {resposta_completa.strip()}\n")
-        f.write(f"---------------------\n")'''
-
-
 # Loop principal
 while True:
     ret, frame = cam.read()
@@ -220,14 +234,22 @@ while True:
         print("Error: Can't receive frame.")
         break
 
-    frame_com_texto = adicionar_texto_abaixo(frame, descricao_actual)
-    cv2.imshow('Camera', frame_com_texto)
+    # Mostrar a imagem + caixas normais
+    caixas_texto = [
+        ("Descricao da imagem", descricao_actual, (0, 0, 0)),
+        ("Texto audio", texto_audio_actual, (50, 50, 50)),
+        ("Analise final", analise_final_actual, (80, 80, 80))
+    ]
 
-    if cv2.waitKey(1) == ord('s'):
+    frame_com_textos = adicionar_multiplos_textos_abaixo(frame, caixas_texto)
+    cv2.imshow('Camera', frame_com_textos)
+
+    key = cv2.waitKey(1)
+    if key == ord('s'):
         screenshot()
         audio()
 
-    if cv2.waitKey(1) == ord('b'):
+    if key == ord('b'):
         break
 
 cam.release()
