@@ -20,10 +20,9 @@ descricao_actual = ""
 texto_audio_actual = ""
 analise_final_actual = ""
 url = "http://localhost:11434/api/generate"
-server_ip = '127.0.0.1'
+server_ip = '192.168.1.79'
 port = 12345
 s = socket.socket()
-
 
 cam = cv2.VideoCapture(0)
 cam.set(cv2.CAP_PROP_FRAME_WIDTH, 600)
@@ -216,6 +215,7 @@ def audio():
     # Guardar análise final
     analise_final_actual = unidecode(resposta_completa.strip())
 
+
     with open("resultados.html", "a", encoding="utf-8") as f:
          f.write(f"""
                  <hr>
@@ -235,7 +235,7 @@ def audio():
     message = (
     f"Analise de imagem: {respostamoondream.strip()}\n"
     f"Texto ouvido: {textocompleto.strip()}\n"
-    f"Texto ouvido: {resposta_completa().strip()}"
+    f"Texto finalizado: {analise_final_actual.strip()}\n"
               )
 
     s.sendall(message.encode())
