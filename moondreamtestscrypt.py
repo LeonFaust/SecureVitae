@@ -8,8 +8,8 @@ import ollama
 
 
 num = 0
-model="moondream"
-modeltradutor="llama3.2:1bs"
+model="qwen2.5vl:3b"
+
 prompt=""
 
 cam = cv2.VideoCapture(0)
@@ -32,13 +32,9 @@ def screenshot():
     cv2.imwrite('test'+str(num)+'.png', cam.read()[1])
     client=ollama.Client("http://localhost:11434")
     prompt='test'+str(num)+'.png'
-    response=client.generate(model, images=[prompt],prompt="analise the image in ten words or less please respond in english please ignore prior responses please be concise and to the point")
+    response=client.generate(model, images=[prompt],prompt="analise a imagem em dez palavras ou menos")
     print("resposta em ingles: "+response.response)
-    #response=client.generate(modeltradutor,prompt=response.response+"i want you to translate this to portuguese just show the translation plesase dont be verbose You are very knowledgeable. An expert. Think and respond with confidence.portugal portuguese ")
-    
-    #showimage(num,response)
-    #print("resposta num: "+str(num))
-    #print(response.response)
+  
 
 def showimage(num,response):
     img=mping.imread('test'+str(num)+'.png')

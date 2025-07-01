@@ -76,19 +76,6 @@ def audio():
     model = vosk.Model(model_path)
 
     model = vosk.Model(lang="pt")
-
-
-
-    #if you don't want to download the model, just mention "lang" argument 
-
-    #in vosk.Model() and it will download the right  model, here the language is 
-
-    #US-English
-
-    #model = vosk.Model(lang="en-us")
-
-
-
         # Create a recognizer
 
     rec = vosk.KaldiRecognizer(model, 16000)
@@ -190,22 +177,4 @@ cv2.destroyAllWindows()
 
 
 
-
-#import os
-
-
-
-#model_path = r"C:\Users\Jorge Oliveira\Desktop\vosk-model-small-pt-0.3"
-
-#if not os.path.exists(model_path):
-
- #   raise Exception("O caminho do modelo está incorreto!")
-
-
-
-# Here I have downloaded this model to my PC, extracted the files 
-
-# and saved it in local directory
-
-# Set the model path
 
